@@ -30,11 +30,11 @@ const bebas = Bebas_Neue({
 export const metadata: Metadata = {
   title: "WADE — as seen on hinge",
   description:
-    "Tired of the same old guys? Introducing WADE: a single male, 27, denver-based, fully assembled, cat-tested. Apply now.",
+    "Tired of the same old guys? Introducing WADE: a single male, 33, denver-based, fully assembled, cat-tested. Apply now.",
   openGraph: {
     title: "WADE — as seen on hinge",
     description:
-      "Tired of the same old guys? Introducing WADE: a single male, 27, denver-based, fully assembled, cat-tested. Apply now.",
+      "Tired of the same old guys? Introducing WADE: a single male, 33, denver-based, fully assembled, cat-tested. Apply now.",
     url: "https://datewade.com",
     siteName: "WADE",
     type: "website",

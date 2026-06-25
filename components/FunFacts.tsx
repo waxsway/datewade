@@ -7,13 +7,13 @@ import { useState } from "react";
 // that cycles through wade-fact tidbits. Edit FACTS freely.
 
 const FACTS: string[] = [
-  "Holds the record for longest one-sided conversation with a cat in his apartment.",
+  "Has a full Avatar: The Last Airbender sleeve. Can rank the nations.",
+  "Lives with Mushroom and Pickle — two Scottish Fold sisters. They have a group chat.",
+  "Has never gone on a hike voluntarily. Will not start now.",
   "Quietly competitive at trivia. Pretends he isn't.",
-  "Reads a real book at least once a quarter.",
   "Has opinions about coffee but won't push them on you.",
-  "Owns a single nice shirt, knows exactly when to wear it.",
-  "Decisions are made while pacing. Always.",
-  "Can quote almost the entire Princess Bride.",
+  "Owns one nice shirt. Knows exactly when to wear it.",
+  "Makes most decisions while pacing.",
   "Has never said \"my truth.\" Has used \"frankly\" twice this week.",
 ];
 

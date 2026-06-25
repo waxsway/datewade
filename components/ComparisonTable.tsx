@@ -20,12 +20,12 @@ const ROWS: Row[] = [
   {
     topic: "Cats",
     others: "Allergic. Also emotionally.",
-    wade: "Co-parent with one. She runs the household.",
+    wade: "Co-parents Mushroom & Pickle. They run the household; he just lives there.",
   },
   {
     topic: "Plans for Saturday",
     others: "Will figure it out by 9:43pm.",
-    wade: "Coffee in the morning, a hike if you want, no pressure either way.",
+    wade: "Coffee in the morning. Dinner reservation in the evening. Cat in between.",
   },
   {
     topic: "Replies to messages",
@@ -39,8 +39,8 @@ const ROWS: Row[] = [
   },
   {
     topic: "Outdoors",
-    others: "Posts a photo on a mountain once a year, hasn't read a book since 2019.",
-    wade: "Will go on the hike. Will also be very happy to not go on the hike.",
+    others: "Posts a single mountain photo once a year. Hasn't read a book since 2019.",
+    wade: "Will not go on a hike. Refuses, politely. Will take you to dinner instead.",
   },
   {
     topic: "Photos",
@@ -48,9 +48,9 @@ const ROWS: Row[] = [
     wade: "Scroll up. The cat one is the cat one.",
   },
   {
-    topic: "Sense of humor",
-    others: "Quotes The Office.",
-    wade: "Quotes The Office, but reads the room first.",
+    topic: "Tattoos",
+    others: "A barbed wire bicep band his uncle gave him in 2008.",
+    wade: "Full Avatar: The Last Airbender sleeve. Knows every nation by heart.",
   },
 ];
 

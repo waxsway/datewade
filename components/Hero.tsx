@@ -60,7 +60,7 @@ export default function Hero() {
           </h1>
           <p className="mt-5 max-w-2xl mx-auto text-lg sm:text-xl text-[var(--color-ink-soft)] leading-snug font-medium">
             A revolutionary new option in the dating marketplace.
-            Twenty-seven years old. Single. Denver-based. Fully assembled.
+            Thirty-three years old. Single. Denver-based. Fully assembled.
             Yours to apply for — completely free.
           </p>
         </div>
@@ -88,6 +88,7 @@ export default function Hero() {
                 loop
                 playsInline
                 autoPlay
+                controls={unmuted}
                 className="w-full h-full object-cover"
               />
               {!unmuted && (

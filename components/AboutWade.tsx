@@ -14,7 +14,7 @@ type Polaroid = {
 };
 
 const POLAROIDS: Polaroid[] = [
-  { src: "/photos/wade-2.jpg", alt: "wade with the cat", caption: "with the supervisor", rotation: -4 },
+  { src: "/photos/wade-2.jpg", alt: "wade with one of the cats", caption: "with one of the bosses", rotation: -4 },
   { src: "/photos/wade-3.jpg", alt: "wade photo 3", caption: "natural habitat", rotation: 3 },
   { src: "/photos/wade-1.jpg", alt: "wade photo 1", caption: "off-the-grid mode", rotation: -2 },
   { src: "/photos/wade-4.jpg", alt: "wade photo 4", caption: "in the wild", rotation: 5 },
@@ -24,13 +24,14 @@ const POLAROIDS: Polaroid[] = [
 ];
 
 const SPECS: Array<{ key: string; value: string }> = [
-  { key: "MODEL", value: "Wade, V.27" },
+  { key: "MODEL", value: "Wade, V.33" },
   { key: "MFG. LOCATION", value: "Denver, Colorado" },
   { key: "OCCUPATION", value: "Founder, startup" },
-  { key: "CO-PILOT", value: "One cat. Tabby. Strong opinions." },
+  { key: "CO-PILOTS", value: "Mushroom & Pickle, Scottish Fold sisters. Both have strong opinions." },
   { key: "HUMOR", value: "Quietly funny. Not the loudest in the room." },
   { key: "ENERGY", value: "Homebody by default. Outdoorsy on request." },
   { key: "TASTE", value: "Slightly nerdy / alt. Likes weird people." },
+  { key: "INK", value: "Full Avatar: The Last Airbender sleeve. Yes, that one." },
   { key: "WARRANTY", value: "Lifetime, if mutually entered into." },
 ];
 
@@ -135,8 +136,8 @@ export default function AboutWade() {
               ★ MANUFACTURER&rsquo;S NOTE ★
             </div>
             <p className="text-sm text-[var(--color-ink-soft)] leading-snug italic">
-              &ldquo;Cool guy. Replies to messages. Owns a cat. Genuinely
-              kind. You could do a lot worse.&rdquo; — His Mom
+              &ldquo;Cool guy. Replies to messages. Owns two cats.
+              Genuinely kind. You could do a lot worse.&rdquo; — His Mom
             </p>
           </div>
         </div>
