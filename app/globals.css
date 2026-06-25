@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-bg: #fef9f3;
+  --color-bg-subtle: #f5ede0;
+  --color-ink: #1a1410;
+  --color-ink-soft: #4a3f37;
+  --color-ink-muted: #8a7a6e;
+  --color-coral: #e85d5d;
+  --color-coral-soft: #f5b4a8;
+  --color-teal: #4d827d;
+  --color-paper: #fffdf8;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-caveat: var(--font-caveat), cursive;
+  --font-serif: var(--font-serif), Georgia, serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html, body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.04;
+  background-image: radial-gradient(circle at 1px 1px, var(--color-ink) 1px, transparent 0);
+  background-size: 3px 3px;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+body > * { position: relative; z-index: 1; }
+
+.polaroid {
+  background: var(--color-paper);
+  padding: 14px 14px 56px;
+  box-shadow:
+    0 1px 2px rgba(26,20,16,0.08),
+    0 12px 30px -10px rgba(26,20,16,0.25);
+  transition: transform 0.3s ease;
 }
+
+.polaroid:hover { transform: rotate(0deg) scale(1.02) !important; }
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-1deg); }
+  50% { transform: rotate(1deg); }
+}
+
+.wiggle { animation: wiggle 2s ease-in-out infinite; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track { animation: marquee 28s linear infinite; }
