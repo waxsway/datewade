@@ -1,18 +1,20 @@
 export default function Footer() {
   const year = new Date().getFullYear();
   return (
-    <footer className="py-16 px-6 border-t border-[var(--color-ink-muted)]/15">
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--color-ink-muted)]">
-        <div className="flex items-center gap-3">
-          <span className="font-[family-name:var(--font-caveat)] text-base text-[var(--color-ink-soft)]">
-            made with too much time
-          </span>
-          <span>·</span>
-          <span>denver, {year}</span>
+    <footer className="bg-[var(--color-navy)] text-[var(--color-paper)] py-12 px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto text-center space-y-4">
+        <div className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl uppercase">
+          ★ DATEWADE.COM ★
         </div>
-        <div className="text-[10px] tracking-wide uppercase">
-          no fees · no commitment · operators not actually standing by
+        <div className="font-[family-name:var(--font-display-2)] tracking-[0.18em] text-xs sm:text-sm text-[var(--color-yellow)]">
+          THIS PROMOTION ENDS WHEN HE GETS A GIRLFRIEND
         </div>
+        <p className="max-w-xl mx-auto text-xs sm:text-sm text-[var(--color-cream)]/70 leading-relaxed">
+          NOT A REAL INFOMERCIAL. NOT AFFILIATED WITH HINGE OR ANY DATING APP.
+          OPERATORS ARE NOT STANDING BY. NO PURCHASE NECESSARY. VOID WHERE
+          PROHIBITED BY GOOD SENSE. SOME RESTRICTIONS MAY APPLY,
+          NAMELY THAT HE LIVES IN DENVER. ©&nbsp;{year}&nbsp;WADE.
+        </p>
       </div>
     </footer>
   );

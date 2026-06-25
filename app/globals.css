@@ -1,61 +1,169 @@
 @import "tailwindcss";
 
+/* 90s direct-response infomercial palette. Bright primary red, mustard
+   yellow, deep navy, off-white "paper". High contrast, the way an
+   actual VHS-era infomercial was lit. */
 @theme {
-  --color-bg: #fef9f3;
-  --color-bg-subtle: #f5ede0;
-  --color-ink: #1a1410;
-  --color-ink-soft: #4a3f37;
-  --color-ink-muted: #8a7a6e;
-  --color-coral: #e85d5d;
-  --color-coral-soft: #f5b4a8;
-  --color-teal: #4d827d;
-  --color-paper: #fffdf8;
+  --color-bg: #fef6dc;
+  --color-paper: #fff8e7;
+  --color-navy: #0e1a3a;
+  --color-navy-deep: #050a1c;
+  --color-red: #dc1f26;
+  --color-red-deep: #9a161c;
+  --color-yellow: #f5c518;
+  --color-cream: #f3e8c4;
+  --color-ink: #0e1a3a;
+  --color-ink-soft: #2b3050;
+  --color-ink-muted: #65697b;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-caveat: var(--font-caveat), cursive;
-  --font-serif: var(--font-serif), Georgia, serif;
+  --font-body: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-display), Impact, "Haettenschweiler", "Arial Narrow Bold", sans-serif;
+  --font-display-2: var(--font-display-2), Impact, "Arial Narrow Bold", sans-serif;
 }
 
 html, body {
   background: var(--color-bg);
   color: var(--color-ink);
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
 }
 
+/* VHS scanlines + grain so the page feels like late-night cable. Subtle
+   enough to not interfere with reading. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
-  opacity: 0.04;
-  background-image: radial-gradient(circle at 1px 1px, var(--color-ink) 1px, transparent 0);
+  z-index: 1;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.04) 0px,
+      rgba(0,0,0,0.04) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  opacity: 0.45;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image: radial-gradient(circle at 1px 1px, rgba(14,26,58,0.08) 1px, transparent 0);
   background-size: 3px 3px;
+  opacity: 0.6;
 }
 
-body > * { position: relative; z-index: 1; }
+body > * { position: relative; z-index: 2; }
 
-.polaroid {
-  background: var(--color-paper);
-  padding: 14px 14px 56px;
-  box-shadow:
-    0 1px 2px rgba(26,20,16,0.08),
-    0 12px 30px -10px rgba(26,20,16,0.25);
-  transition: transform 0.3s ease;
-}
-
-.polaroid:hover { transform: rotate(0deg) scale(1.02) !important; }
-
-@keyframes wiggle {
-  0%, 100% { transform: rotate(-1deg); }
-  50% { transform: rotate(1deg); }
-}
-
-.wiggle { animation: wiggle 2s ease-in-out infinite; }
-
+/* Marquee for ticker strips. */
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
+.marquee-track { animation: marquee 32s linear infinite; }
 
-.marquee-track { animation: marquee 28s linear infinite; }
+/* Starburst badge — the classic infomercial "STARS" callout. CSS only. */
+.starburst {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-yellow);
+  color: var(--color-red-deep);
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  padding: 0.9em 1.2em;
+  text-align: center;
+  line-height: 0.95;
+  text-transform: uppercase;
+  clip-path: polygon(
+    50% 0%, 60% 12%, 75% 5%, 78% 22%, 95% 22%, 88% 38%,
+    100% 50%, 88% 62%, 95% 78%, 78% 78%, 75% 95%, 60% 88%,
+    50% 100%, 40% 88%, 25% 95%, 22% 78%, 5% 78%, 12% 62%,
+    0% 50%, 12% 38%, 5% 22%, 22% 22%, 25% 5%, 40% 12%
+  );
+}
+
+/* "AS SEEN ON TV" pill badge — that exact silhouette. */
+.as-seen-on-tv {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-red);
+  color: var(--color-paper);
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border: 3px solid var(--color-yellow);
+  box-shadow:
+    0 0 0 3px var(--color-red),
+    4px 4px 0 var(--color-navy);
+}
+
+/* CRT TV bezel reused for fact widget — slightly less brown, more
+   1990s-television beige. */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.blink { animation: blink 1s steps(1, end) infinite; }
+
+@keyframes ticker-flash {
+  0%, 60%, 100% { background: var(--color-red); color: var(--color-paper); }
+  30% { background: var(--color-yellow); color: var(--color-red-deep); }
+}
+.flash-strip { animation: ticker-flash 1.6s steps(1, end) infinite; }
+
+/* Tilt + 'pop' on hover for the comparison column highlighting. */
+.tilt-pop {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.tilt-pop:hover {
+  transform: scale(1.02) rotate(-0.5deg);
+}
+
+/* Big chunky button style for the primary CTAs. */
+.btn-pop {
+  font-family: var(--font-display);
+  letter-spacing: 0.05em;
+  background: var(--color-red);
+  color: var(--color-paper);
+  text-transform: uppercase;
+  padding: 18px 28px;
+  border: 4px solid var(--color-navy);
+  box-shadow: 6px 6px 0 var(--color-navy);
+  display: inline-block;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-pop:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 9px 9px 0 var(--color-navy);
+}
+.btn-pop:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--color-navy);
+}
+
+.btn-pop-yellow {
+  background: var(--color-yellow);
+  color: var(--color-navy);
+}
+
+/* Section dividers — the chunky bordered look. */
+.borderbox {
+  background: var(--color-paper);
+  border: 4px solid var(--color-navy);
+  box-shadow: 6px 6px 0 var(--color-navy);
+}
+
+.borderbox-red {
+  background: var(--color-red);
+  color: var(--color-paper);
+  border: 4px solid var(--color-navy);
+  box-shadow: 6px 6px 0 var(--color-navy);
+}

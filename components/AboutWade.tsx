@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-// About Wade. Polaroid stack on the left, intro paragraph on the right.
-// The polaroid stack is the personality piece — pictures fan out, you
-// can shuffle them with a click. Each carries a tiny handwritten caption.
+// ABOUT WADE — but written like a product spec sheet on a late-night
+// shopping channel. Polaroid stack on the left, "PRODUCT
+// SPECIFICATIONS" panel on the right, announcer copy throughout.
 
 type Polaroid = {
   src: string;
@@ -13,17 +13,25 @@ type Polaroid = {
   rotation: number;
 };
 
-// Roster of the photos in /public/photos. Wade-2 already lives in the
-// hero, so this stack pulls the other six. Captions are kept short and
-// in his voice; he should sweep these for accuracy when he picks
-// final shots.
 const POLAROIDS: Polaroid[] = [
-  { src: "/photos/wade-3.jpg", alt: "wade photo 3", caption: "trying to be outsidey", rotation: -4 },
-  { src: "/photos/wade-1.jpg", alt: "wade photo 1", caption: "garage hangs", rotation: 3 },
-  { src: "/photos/wade-4.jpg", alt: "wade photo 4", caption: "a candid", rotation: -2 },
-  { src: "/photos/wade-5.jpg", alt: "wade photo 5", caption: "look at this guy", rotation: 5 },
-  { src: "/photos/wade-6.jpg", alt: "wade photo 6", caption: "denver", rotation: -3 },
-  { src: "/photos/wade-7.jpg", alt: "wade photo 7", caption: "the look", rotation: 2 },
+  { src: "/photos/wade-2.jpg", alt: "wade with the cat", caption: "with the supervisor", rotation: -4 },
+  { src: "/photos/wade-3.jpg", alt: "wade photo 3", caption: "natural habitat", rotation: 3 },
+  { src: "/photos/wade-1.jpg", alt: "wade photo 1", caption: "off-the-grid mode", rotation: -2 },
+  { src: "/photos/wade-4.jpg", alt: "wade photo 4", caption: "in the wild", rotation: 5 },
+  { src: "/photos/wade-5.jpg", alt: "wade photo 5", caption: "this guy", rotation: -3 },
+  { src: "/photos/wade-6.jpg", alt: "wade photo 6", caption: "denver, co", rotation: 2 },
+  { src: "/photos/wade-7.jpg", alt: "wade photo 7", caption: "documentation", rotation: -1 },
+];
+
+const SPECS: Array<{ key: string; value: string }> = [
+  { key: "MODEL", value: "Wade, V.27" },
+  { key: "MFG. LOCATION", value: "Denver, Colorado" },
+  { key: "OCCUPATION", value: "Founder, startup" },
+  { key: "CO-PILOT", value: "One cat. Tabby. Strong opinions." },
+  { key: "HUMOR", value: "Quietly funny. Not the loudest in the room." },
+  { key: "ENERGY", value: "Homebody by default. Outdoorsy on request." },
+  { key: "TASTE", value: "Slightly nerdy / alt. Likes weird people." },
+  { key: "WARRANTY", value: "Lifetime, if mutually entered into." },
 ];
 
 export default function AboutWade() {
@@ -37,9 +45,24 @@ export default function AboutWade() {
   }
 
   return (
-    <section className="py-24 px-6 bg-[var(--color-bg-subtle)]">
-      <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-16 items-center">
-        {/* Stack — click anywhere on it to cycle. */}
+    <section className="relative px-4 sm:px-6 py-20 bg-[var(--color-bg)] overflow-hidden">
+      <div className="max-w-5xl mx-auto text-center mb-12">
+        <div className="inline-block as-seen-on-tv text-sm sm:text-base mb-5">
+          ★ MEET THE UNIT ★
+        </div>
+        <h2 className="font-[family-name:var(--font-display)] text-[clamp(40px,7vw,84px)] leading-[0.9] text-[var(--color-navy)] uppercase">
+          So,{" "}
+          <span className="text-[var(--color-red)]">Who Is Wade?</span>
+        </h2>
+        <p className="mt-5 max-w-2xl mx-auto text-lg text-[var(--color-ink-soft)] leading-snug font-medium">
+          A brief, third-party overview of the product on offer. Read
+          carefully. There is no replacement available in this make
+          or model.
+        </p>
+      </div>
+
+      <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+        {/* Polaroid stack */}
         <div className="relative h-[460px] flex items-center justify-center">
           <button
             type="button"
@@ -53,12 +76,13 @@ export default function AboutWade() {
               return (
                 <div
                   key={polaroidIndex}
-                  className="polaroid absolute inset-0 w-[280px]"
+                  className="absolute inset-0 w-[280px] bg-[var(--color-paper)] p-3 pb-12 border-4 border-[var(--color-navy)]"
                   style={{
                     transform: `rotate(${p.rotation + stackIndex * 0.4}deg) translateY(${(order.length - 1 - stackIndex) * -2}px)`,
                     zIndex: stackIndex,
-                    transition: "transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 0.3s ease",
+                    transition: "transform 0.45s cubic-bezier(0.2, 0.9, 0.3, 1)",
                     pointerEvents: isTop ? "auto" : "none",
+                    boxShadow: `${4 + stackIndex}px ${4 + stackIndex}px 0 var(--color-navy)`,
                   }}
                 >
                   <img
@@ -66,7 +90,7 @@ export default function AboutWade() {
                     alt={p.alt}
                     className="w-full aspect-square object-cover"
                   />
-                  <div className="absolute mt-3 text-center w-[252px] font-[family-name:var(--font-caveat)] text-lg text-[var(--color-ink-soft)]">
+                  <div className="absolute left-0 right-0 mt-2 text-center font-[family-name:var(--font-display-2)] text-base tracking-wider text-[var(--color-navy)]">
                     {p.caption}
                   </div>
                 </div>
@@ -74,54 +98,46 @@ export default function AboutWade() {
             })}
           </button>
 
-          <span className="absolute -bottom-1 text-xs text-[var(--color-ink-muted)] tracking-wide">
-            click the stack to flip through
+          <span className="absolute -bottom-1 font-[family-name:var(--font-display-2)] text-xs tracking-widest text-[var(--color-ink-muted)]">
+            ▸ CLICK TO ROTATE PHOTOS ◂
           </span>
         </div>
 
-        <div>
-          <div className="text-sm font-medium text-[var(--color-coral)] tracking-wide uppercase mb-3">
-            about me
+        {/* Spec sheet */}
+        <div className="borderbox p-6 sm:p-8">
+          <div className="font-[family-name:var(--font-display-2)] tracking-[0.18em] text-sm text-[var(--color-red)] mb-2">
+            ★ PRODUCT SPECIFICATIONS ★
           </div>
-          <h2 className="font-[family-name:var(--font-serif)] text-4xl md:text-5xl leading-tight text-[var(--color-ink)] mb-6">
-            here&rsquo;s the actual{" "}
-            <span className="italic font-[family-name:var(--font-caveat)] text-[var(--color-coral)]">
-              gist
-            </span>
-            .
-          </h2>
-
-          <div className="space-y-4 text-[var(--color-ink-soft)] leading-relaxed">
-            <p>
-              i&rsquo;m 27, i live in denver, i run a startup called
-              credscore that does wallet risk intelligence (it&rsquo;s
-              fine if that meant nothing to you — most of my dates have
-              no idea what i do). i used to compete in esports, i still
-              think about it more than i should.
-            </p>
-            <p>
-              i have a cat. her name is in the application — you&rsquo;ll
-              meet her if this works out. i&rsquo;m more of a homebody
-              than not, but i&rsquo;ll go on a hike or to a show if
-              there&rsquo;s a good reason. nerdy and slightly alt by
-              default.
-            </p>
-            <p>
-              the kind of person i&rsquo;m hoping to meet is kind,
-              actually funny, a little weird, and genuine. not the
-              performance of those things. the things themselves.
-            </p>
+          <div className="font-[family-name:var(--font-display)] text-3xl text-[var(--color-navy)] uppercase mb-6">
+            What You&rsquo;re Working With
           </div>
 
-          <div className="mt-8 flex flex-wrap gap-2">
-            {["denver", "cat dad", "nerd", "homebody (mostly)", "founder", "former esports"].map((tag) => (
-              <span
-                key={tag}
-                className="text-xs font-medium px-3 py-1.5 bg-[var(--color-paper)] border border-[var(--color-ink-muted)]/20 rounded-full text-[var(--color-ink-soft)]"
-              >
-                {tag}
-              </span>
-            ))}
+          <table className="w-full text-left">
+            <tbody>
+              {SPECS.map((s) => (
+                <tr
+                  key={s.key}
+                  className="border-b-2 border-dashed border-[var(--color-navy)]/25 last:border-b-0"
+                >
+                  <td className="py-3 pr-4 font-[family-name:var(--font-display-2)] text-xs tracking-[0.14em] text-[var(--color-ink-muted)] uppercase whitespace-nowrap align-top">
+                    {s.key}
+                  </td>
+                  <td className="py-3 text-[var(--color-navy)] font-medium leading-snug">
+                    {s.value}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="mt-6 pt-4 border-t-4 border-[var(--color-navy)]">
+            <div className="text-xs font-[family-name:var(--font-display-2)] tracking-widest text-[var(--color-ink-muted)] mb-2">
+              ★ MANUFACTURER&rsquo;S NOTE ★
+            </div>
+            <p className="text-sm text-[var(--color-ink-soft)] leading-snug italic">
+              &ldquo;Cool guy. Replies to messages. Owns a cat. Genuinely
+              kind. You could do a lot worse.&rdquo; — His Mom
+            </p>
           </div>
         </div>
       </div>

@@ -1,48 +1,49 @@
 import type { Metadata } from "next";
-import { Geist, Caveat, Instrument_Serif } from "next/font/google";
+import { Inter, Anton, Bebas_Neue } from "next/font/google";
 import "./globals.css";
 
-// Body: clean modern sans (Geist).
-// Handwritten accents and section headers: Caveat (cursive, used sparingly).
-// Editorial headlines: Instrument Serif (warm, characterful, not stuffy).
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Body: Inter (clean, neutral, gets out of the way).
+// Display headlines: Anton — heavy condensed sans, the closest free
+// equivalent to Impact / the classic 90s-infomercial headline font.
+// Secondary display: Bebas Neue — pairs with Anton for ticker / chip
+// type, slightly less aggressive.
+const inter = Inter({
+  variable: "--font-body",
   subsets: ["latin"],
   display: "swap",
 });
 
-const caveat = Caveat({
-  variable: "--font-caveat",
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  display: "swap",
-});
-
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-serif",
+const anton = Anton({
+  variable: "--font-display",
   subsets: ["latin"],
   weight: ["400"],
-  style: ["normal", "italic"],
+  display: "swap",
+});
+
+const bebas = Bebas_Neue({
+  variable: "--font-display-2",
+  subsets: ["latin"],
+  weight: ["400"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "date wade",
+  title: "WADE — as seen on hinge",
   description:
-    "apparently i need to start dating again. tell me about you.",
+    "Tired of the same old guys? Introducing WADE: a single male, 27, denver-based, fully assembled, cat-tested. Apply now.",
   openGraph: {
-    title: "date wade",
+    title: "WADE — as seen on hinge",
     description:
-      "apparently i need to start dating again. tell me about you.",
+      "Tired of the same old guys? Introducing WADE: a single male, 27, denver-based, fully assembled, cat-tested. Apply now.",
     url: "https://datewade.com",
-    siteName: "date wade",
+    siteName: "WADE",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "date wade",
+    title: "WADE — as seen on hinge",
     description:
-      "apparently i need to start dating again. tell me about you.",
+      "Tired of the same old guys? Introducing WADE. Apply now.",
   },
 };
 
@@ -54,7 +55,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${caveat.variable} ${instrumentSerif.variable} antialiased`}
+      className={`${inter.variable} ${anton.variable} ${bebas.variable} antialiased`}
     >
       <body className="min-h-full">{children}</body>
     </html>
