@@ -300,7 +300,7 @@ export default function BombTag() {
         <div className="hero-copy"><div className="hero-kicker">YOUR FRIENDS. ONE BOMB. ZERO TRUST.</div>
           <h1>BOMB<span>TAG</span><b>!</b></h1>
           <p>One ticking bomb. One very unlucky friend. Tag someone to pass it before the clock hits zero. Last player standing wins.</p>
-          <div className="hero-stats"><span><Icon kind="users"/> 2–8 PLAYERS</span><span><Icon kind="bolt"/> 30-SECOND ROUNDS</span><span>⚡ NO SIGN-UP</span></div>
+          <div className="hero-stats"><span><Icon kind="users"/> 2–8 PLAYERS</span><span><Icon kind="bolt"/> QUICK-FIRE ROUNDS</span><span>⚡ NO SIGN-UP</span></div>
         </div>
       </section>
       <section className="entry-wrap">
