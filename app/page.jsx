@@ -1,360 +1,314 @@
 'use client';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import Arena3D from '../components/Arena3D.jsx';
+import {GAME_MODES,catalog,TOTAL_CHALLENGES,preset,newPlayer,freshRoom,addPlayer,removePlayer,
+ beginParty,setOptions,tick,finishRound} from '../lib/party.js';
 
-import {useEffect, useRef, useState} from 'react';
-
-const WIDTH = 900;
-const HEIGHT = 510;
-const LIMIT = 8;
-const COLORS = ['#d7ff4a','#a88bff','#ff729e','#64dcff','#ffbf69','#81f7cf','#e3a6f5','#ff8c66'];
-const APP_ID = 'com.datewade.bombtag.party.2026';
-const emptyKeys = () => ({up:false,down:false,left:false,right:false});
-const safeName = (name) => String(name || '').trim().slice(0,15) || 'Mystery Guest';
-const makePlayer = (id, name, index) => ({
-  id, name:safeName(name), x:WIDTH/2 + Math.cos(index * .785) * 165,
-  y:HEIGHT/2 + Math.sin(index * .785) * 135, alive:true, wins:0,
-  color: COLORS[index % COLORS.length]
-});
-const initialGame = (id, name) => ({
-  phase:'lobby', players:[makePlayer(id,name,0)], carrier:null,
-  seconds:16, round:0, cooldown:0, champion:null, hostId:id, event:''
-});
-const isBot = (id) => id.startsWith('bot-');
-const randomCode = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = new Uint8Array(6);
-  crypto.getRandomValues(bytes);
-  return [...bytes].map(b => chars[b % chars.length]).join('');
-};
-const safeSend = (action,data,opts) => {
-  if (action) Promise.resolve(action.send(data,opts)).catch(() => {});
-};
-const sample = (array) => array[Math.floor(Math.random()*array.length)];
-
-function startMatch(before) {
-  const players = before.players.map((p,i) => ({
-    ...p, alive:true, x:WIDTH/2 + Math.cos(i*2*Math.PI/before.players.length)*165,
-    y:HEIGHT/2 + Math.sin(i*2*Math.PI/before.players.length)*140
-  }));
-  return {...before,players,phase:'intermission',round:1,seconds:3,
-    carrier:sample(players).id, cooldown:1.2,champion:null,event:'GET READY'};
+const APP_ID='com.datewade.party.arena.2026';
+const ID_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const clean=(v)=>String(v||'').trim().slice(0,15)||'Party Animal';
+const blank=()=>({x:0,z:0});
+const safeSend=(action,data,opts)=>{if(action)Promise.resolve(action.send(data,opts)).catch(()=>{});};
+function inviteCode(){
+ const bytes=new Uint8Array(6);crypto.getRandomValues(bytes);
+ return Array.from(bytes,byte=>ID_ALPHABET[byte%ID_ALPHABET.length]).join('');
 }
-function advanceGame(g, keys, delta, tick) {
-  if (g.phase !== 'playing' && g.phase !== 'intermission') return g;
-  const dt = Math.min(delta,.1);
-  const next = {...g, players:g.players.map(p=>({...p})), seconds:Math.max(0,g.seconds-dt),
-    cooldown:Math.max(0,g.cooldown-dt)};
-  if (next.phase === 'intermission') {
-    if (next.seconds <= 0) {next.phase='playing';next.seconds=16;next.cooldown=1.5;next.event='RUN!';}
-    return next;
-  }
-  next.players.forEach(p => {
-    if (!p.alive) return;
-    let k = keys[p.id] || emptyKeys();
-    if (isBot(p.id)) {
-      const holder = next.players.find(other=>other.id===next.carrier);
-      const angle = (tick/1050 + p.id.length*1.6);
-      const awayX = holder ? p.x - holder.x : 0;
-      const awayY = holder ? p.y - holder.y : 0;
-      const flee = p.id!==next.carrier && holder && Math.hypot(awayX,awayY)<255;
-      let dirX = flee ? awayX : Math.cos(angle)*150 + (holder ? holder.x-p.x:0);
-      let dirY = flee ? awayY : Math.sin(angle)*150 + (holder ? holder.y-p.y:0);
-      const norm = Math.hypot(dirX,dirY)||1;
-      k = {left:dirX/norm<-.3,right:dirX/norm>.3,up:dirY/norm<-.3,down:dirY/norm>.3};
+function formatPoints(points){return Math.max(-99,points||0).toFixed(0);}
+const demo=(()=>{
+ let g=freshRoom('demo','YOU');g=addPlayer(g,'bot-rose','MUSHROOM');g=addPlayer(g,'bot-blue','PICKLE');
+ g=addPlayer(g,'bot-violet','KENNY');return {...g,phase:'playing',challenge:39,bomb:'demo',elapsed:7,remaining:18};
+})();
+export default function Home(){
+ const [mode,setMode]=useState('home'),[name,setName]=useState(''),[joinCode,setJoinCode]=useState('');
+ const [roomCode,setRoomCode]=useState(''),[game,setGame]=useState(null),[notice,setNotice]=useState('');
+ const [connecting,setConnecting]=useState(false),[catalogOpen,setCatalogOpen]=useState(false);
+ const [familyFilter,setFamilyFilter]=useState('all'),[showHelp,setShowHelp]=useState(false);
+ const [sfx,setSfx]=useState(false);
+ const idRef=useRef(''),roomRef=useRef(null),actionsRef=useRef({}),hostRef=useRef(false),hostPeerRef=useRef('');
+ const gameRef=useRef(null),heldRef=useRef(blank()),inputRef=useRef({}),tickRef=useRef(null);
+ const connectionRef=useRef(false),lastEvent=useRef(-1),audioRef=useRef(null);
+ const isHost=hostRef.current;
+ const me=game?.players?.find(p=>p.id===idRef.current);
+ const challenge=preset(game?.phase==='lobby' ? game?.selection||0 : game?.challenge||0);
+ const scoreboard=(game?.players||[]).slice().sort((a,b)=>(game?.phase==='podium'?b.points-a.points:b.score-a.score));
+ const filtered=useMemo(()=>familyFilter==='all'?catalog:catalog.filter(c=>String(c.mode)===familyFilter),[familyFilter]);
+ useEffect(()=>{
+  try{const remembered=localStorage.getItem('datewade-name');if(remembered)setName(remembered);
+   const code=new URLSearchParams(window.location.search).get('room');
+   if(code&&/^[A-Z2-9]{6}$/i.test(code))setJoinCode(code.toUpperCase());
+  }catch{}
+ },[]);
+ useEffect(()=>{
+  if(!sfx||!game||game.seq===lastEvent.current)return;
+  lastEvent.current=game.seq;
+  if(game.phase==='lobby')return;
+  try{
+   const audio=audioRef.current||new window.AudioContext();audioRef.current=audio;
+   const osc=audio.createOscillator(),gain=audio.createGain();
+   osc.type='sine';osc.frequency.setValueAtTime(game.phase==='results'?540:740,audio.currentTime);
+   osc.frequency.exponentialRampToValueAtTime(300,audio.currentTime+.12);
+   gain.gain.setValueAtTime(.08,audio.currentTime);
+   gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.16);
+   osc.connect(gain);gain.connect(audio.destination);osc.start();osc.stop(audio.currentTime+.18);
+  }catch{}
+ },[game?.seq,sfx,game?.phase]);
+ useEffect(()=>()=>{if(tickRef.current)clearInterval(tickRef.current);
+  try{roomRef.current?.leave();}catch{}audioRef.current?.close().catch(()=>{});},[]);
+ function publish(next){
+  gameRef.current=next;setGame(next);
+  if(hostRef.current)safeSend(actionsRef.current.state,next);
+ }
+ function disconnect(){
+  if(tickRef.current)clearInterval(tickRef.current);tickRef.current=null;
+  try{roomRef.current?.leave();}catch{}
+  roomRef.current=null;actionsRef.current={};hostRef.current=false;hostPeerRef.current='';
+  idRef.current='';connectionRef.current=false;inputRef.current={};heldRef.current=blank();
+  gameRef.current=null;setGame(null);setRoomCode('');setMode('home');setNotice('');setCatalogOpen(false);
+  if(typeof window!=='undefined')history.replaceState({},'',location.pathname);
+ }
+ async function connect(host){
+  if(connecting||connectionRef.current)return;
+  const code=host?inviteCode():joinCode.toUpperCase().trim();
+  if(!host&&!/^[A-Z2-9]{6}$/.test(code)){setNotice('Enter a valid six-character room code.');return;}
+  setNotice('');setConnecting(true);
+  let room=null;
+  try{
+   const {joinRoom,selfId}=await import('trystero');
+   const playerName=clean(name);
+   localStorage.setItem('datewade-name',playerName);
+   room=joinRoom({appId:APP_ID},code);
+   roomRef.current=room;hostRef.current=host;idRef.current=selfId;
+   const hello=room.makeAction('hello');
+   const state=room.makeAction('state');
+   const input=room.makeAction('input');
+   actionsRef.current={hello,state,input};
+   if(host){
+    gameRef.current=freshRoom(selfId,playerName);
+    setGame(gameRef.current);hostPeerRef.current=selfId;
+   }else{gameRef.current=null;setGame(null);}
+   hello.onMessage=(data,{peerId})=>{
+    if(!data||typeof data.name!=='string')return;
+    if(host){
+     const before=gameRef.current;
+     if(before?.players?.length>=8){
+      safeSend(state,{...before,event:'ROOM FULL'}, {target:peerId});return;
+     }
+     const next=addPlayer(before,peerId,clean(data.name));
+     if(next!==before)publish(next);
+     safeSend(state,gameRef.current,{target:peerId});
+    }else if(data.host){
+     hostPeerRef.current=peerId;
+     safeSend(hello,{name:playerName,host:false},{target:peerId});
     }
-    const vx = Number(k.right)-Number(k.left), vy = Number(k.down)-Number(k.up);
-    const length = Math.hypot(vx,vy)||1;
-    p.x = Math.max(31,Math.min(WIDTH-31,p.x+vx/length*250*dt));
-    p.y = Math.max(31,Math.min(HEIGHT-31,p.y+vy/length*250*dt));
-  });
-  if (next.cooldown<=0) {
-    const hot = next.players.find(p=>p.id===next.carrier);
-    if (hot?.alive) {
-      const tagged = next.players.filter(p=>p.alive && p.id!==hot.id
-        && Math.hypot(p.x-hot.x,p.y-hot.y)<55);
-      if(tagged.length) {
-        next.carrier=tagged[0].id;
-        next.cooldown=1.1;
-        next.event=hot.name.toUpperCase()+' PASSED THE BOMB!';
-      }
+   };
+   state.onMessage=(incoming,{peerId})=>{
+    if(host||!incoming||!Array.isArray(incoming.players))return;
+    if(incoming.hostId!==peerId||incoming.players.length>8)return;
+    if(hostPeerRef.current&&hostPeerRef.current!==peerId)return;
+    hostPeerRef.current=peerId;gameRef.current=incoming;setGame(incoming);
+    if(incoming.event==='ROOM FULL')setNotice('Room is full, sorry!');
+    else setNotice('');
+   };
+   input.onMessage=(data,{peerId})=>{
+    if(!host||!gameRef.current?.players.some(p=>p.id===peerId))return;
+    inputRef.current[peerId]={x:Math.max(-1,Math.min(1,Number(data?.x)||0)),
+      z:Math.max(-1,Math.min(1,Number(data?.z)||0))};
+   };
+   room.onPeerJoin=(peerId)=>{
+    safeSend(hello,{name:playerName,host},{target:peerId});
+    if(host&&gameRef.current)safeSend(state,gameRef.current,{target:peerId});
+   };
+   room.onPeerLeave=(peerId)=>{
+    if(host){
+     delete inputRef.current[peerId];
+     if(gameRef.current)publish(removePlayer(gameRef.current,peerId));
+    }else if(peerId===hostPeerRef.current){
+     setNotice('The host disconnected. Leave this room to start a new one.');
+     gameRef.current=null;setGame(null);
     }
-  }
-  if (next.seconds<=0) {
-    const bombed = next.players.find(p=>p.id===next.carrier);
-    if(bombed) bombed.alive=false;
-    const survivors = next.players.filter(p=>p.alive);
-    if(survivors.length <= 1) {
-      const champ = survivors[0];
-      if(champ) champ.wins += 1;
-      next.phase='champion';next.champion=champ?.id || null;next.carrier=null;
-      next.event=champ ? champ.name.toUpperCase()+' WINS!' : 'DRAW!';
-    } else {
-      next.phase='intermission';next.round += 1;next.seconds=3;
-      next.carrier=sample(survivors).id;next.cooldown=1.2;
-      next.event=(bombed?.name.toUpperCase()||'SOMEONE')+' EXPLODED!';
-    }
-  }
-  return next;
-}
-
-function Icon({kind,size=18}) {
-  const paths = {
-    bomb:<><circle cx="11" cy="13" r="7"/><path d="m15.5 7.8 2.8-3M17 4l2.8 1.5m-.6-3.5 1.2-1"/></>,
-    users:<><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 6a3 3 0 0 1 0 6m1 3a5 5 0 0 1 4 5"/></>,
-    link:<><path d="M9 15l6-6M10 6H8a5 5 0 0 0 0 10h2m4-10h2a5 5 0 0 1 0 10h-2"/></>,
-    arrow:<path d="M5 12h14m-6-6 6 6-6 6"/>,
-    bolt:<path d="m13 2-9 12h7l-1 8 10-13h-7l0-7z"/>,
+   };
+   const next=host?freshRoom(selfId,playerName):null;
+   if(host){gameRef.current=next;setGame(next);}
+   connectionRef.current=true;
+   setRoomCode(code);setMode('arena');
+   history.replaceState({},'',location.pathname+'?room='+code);
+   let last=performance.now(),broadcast=0;
+   tickRef.current=setInterval(()=>{
+    if(host){
+     const now=performance.now(),dt=Math.min((now-last)/1000,.12);last=now;
+     inputRef.current[selfId]=heldRef.current;
+     if(!gameRef.current)return;
+     const current=gameRef.current;
+     const next=tick(current,inputRef.current,dt);
+     if(next!==current)gameRef.current=next;
+     broadcast+=dt;
+     if(broadcast>=.12){broadcast=0;publish(gameRef.current);}
+    }else safeSend(input,heldRef.current,{target:hostPeerRef.current||undefined});
+   },host?40:75);
+  }catch(error){
+   try{room?.leave();}catch{}
+   roomRef.current=null;connectionRef.current=false;hostRef.current=false;
+   setNotice('Unable to open room: '+(error?.message||'Connection failed'));
+  }finally{setConnecting(false);}
+ }
+ const start=()=>{if(hostRef.current&&gameRef.current?.players?.length>=2)publish(beginParty(gameRef.current));};
+ const addBot=()=>{
+  if(!hostRef.current||gameRef.current?.phase!=='lobby')return;
+  const before=gameRef.current;if(before.players.length>=8)return;
+  const count=before.players.filter(p=>p.id.startsWith('bot-')).length;
+  const botId='bot-'+Date.now().toString(36)+'-'+count;
+  publish(addPlayer(before,botId,['MUSHROOM','PICKLE','CHAOS BOT','LIL GUY','SPEEDY','WILD CARD','ROBOT'][count%7]));
+ };
+ const option=(options)=>{if(hostRef.current&&gameRef.current)publish(setOptions(gameRef.current,options));};
+ const rematch=()=>{
+  if(!hostRef.current||gameRef.current?.phase!=='podium')return;
+  publish({...gameRef.current,phase:'lobby',players:gameRef.current.players.map(p=>({...p,score:0,points:0,alive:true})),
+    event:'READY FOR ANOTHER PARTY?',round:0,seq:gameRef.current.seq+1});
+ };
+ async function copyLink(){
+  const url=location.origin+location.pathname+'?room='+roomCode;
+  try{await navigator.clipboard.writeText(url);setNotice('Invite link copied!');}
+  catch{setNotice(url);}
+ }
+ function control(x,z){heldRef.current={x,z};
+  if(!hostRef.current)safeSend(actionsRef.current.input,heldRef.current,{target:hostPeerRef.current||undefined});}
+ const directions=useRef(new Set());
+ const updateKeys=()=>{
+  const d=directions.current;
+  const x=Number(d.has('right'))-Number(d.has('left')),z=Number(d.has('down'))-Number(d.has('up'));
+  control(x,z);
+ };
+ useEffect(()=>{
+  if(mode!=='arena')return;
+  const map={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right'};
+  const down=e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;
+   const direction=map[e.key.toLowerCase()];
+   if(direction){e.preventDefault();directions.current.add(direction);updateKeys();}
   };
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[kind]}</svg>;
-}
-
-export default function BombTag() {
-  const [mode,setMode] = useState('home');
-  const [name,setName] = useState('');
-  const [roomInput,setRoomInput] = useState('');
-  const [roomCode,setRoomCode] = useState('');
-  const [game,setGame] = useState(null);
-  const [notice,setNotice] = useState('');
-  const [connecting,setConnecting] = useState(false);
-  const [hostId,setHostId] = useState('');
-  const roomRef=useRef(null), actions=useRef(null), myId=useRef(''), hostRef=useRef(false);
-  const gameRef=useRef(null), keysRef=useRef({}), heldRef=useRef(emptyKeys());
-  const timerRef=useRef(null), joinedRef=useRef(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('bombtag-name');
-      if(stored) setName(stored);
-      const q = new URLSearchParams(location.search).get('room');
-      if(q && /^[A-Z2-9]{6}$/i.test(q)) setRoomInput(q.toUpperCase());
-    } catch {}
-  },[]);
-
-  function publish(g) {
-    gameRef.current = g;
-    setGame(g);
-    if (hostRef.current) safeSend(actions.current?.state,g);
-  }
-  function stop() {
-    if(timerRef.current) clearInterval(timerRef.current);
-    timerRef.current=null;
-    try {roomRef.current?.leave();} catch {}
-    roomRef.current=null;actions.current=null;joinedRef.current=false;
-    hostRef.current=false;keysRef.current={};heldRef.current=emptyKeys();myId.current='';
-    gameRef.current=null;setGame(null);setMode('home');setHostId('');
-    setConnecting(false);setNotice('');
-    if(typeof window!=='undefined') history.replaceState({},'',location.pathname);
-  }
-  useEffect(()=>()=>{if(timerRef.current) clearInterval(timerRef.current);
-    try {roomRef.current?.leave();}catch{}},[]);
-
-  async function connect(creator) {
-    if(connecting || joinedRef.current)return;
-    const trimmed=safeName(name);
-    const code=creator?randomCode():roomInput.toUpperCase().trim();
-    if(!creator && !/^[A-Z2-9]{6}$/.test(code)) {setNotice('Enter a six-character room code.');return;}
-    setConnecting(true);setNotice('');
-    try {
-      const {joinRoom,selfId}=await import('trystero');
-      localStorage.setItem('bombtag-name',trimmed);
-      const room=joinRoom({appId:APP_ID},code);
-      roomRef.current=room;myId.current=selfId;hostRef.current=creator;
-      const hello=room.makeAction('hello');
-      const state=room.makeAction('state');
-      const move=room.makeAction('move');
-      actions.current={hello,state,move};
-      if(creator) {
-        const newState=initialGame(selfId,trimmed);
-        gameRef.current=newState;setGame(newState);setHostId(selfId);
-      } else {
-        gameRef.current=null;setGame(null);setHostId('');
-      }
-      room.onPeerJoin = peerId => {
-        safeSend(hello,{name:trimmed,host:creator},{target:peerId});
-        if(creator && gameRef.current) safeSend(state,gameRef.current,{target:peerId});
-      };
-      hello.onMessage = (payload,{peerId}) => {
-        if(!payload || typeof payload.name!=='string')return;
-        if(!creator) {
-          if(payload.host) setHostId(peerId);
-          return;
-        }
-        const current=gameRef.current;
-        if(!current || current.players.some(p=>p.id===peerId)) return;
-        if(current.players.length>=LIMIT) {safeSend(state,current,{target:peerId});return;}
-        const player=makePlayer(peerId,payload.name,current.players.length);
-        player.alive=current.phase==='lobby';
-        publish({...current,players:[...current.players,player],event:player.name.toUpperCase()+' JOINED'});
-      };
-      state.onMessage=(incoming,{peerId})=>{
-        if(creator || !incoming || incoming.hostId!==peerId || !Array.isArray(incoming.players))return;
-        if(incoming.players.length>LIMIT+1) return;
-        gameRef.current=incoming;setGame(incoming);setHostId(peerId);setNotice('');
-      };
-      move.onMessage=(packet,{peerId})=>{
-        if(!creator || !packet || !gameRef.current?.players.some(p=>p.id===peerId))return;
-        keysRef.current[peerId]={
-          up:packet.up===true,down:packet.down===true,
-          left:packet.left===true,right:packet.right===true
-        };
-      };
-      room.onPeerLeave=(peerId)=>{
-        if(creator) {
-          const previous=gameRef.current;
-          if(!previous)return;
-          const players=previous.players.filter(p=>p.id!==peerId);
-          delete keysRef.current[peerId];
-          let updated={...previous,players,event:'A PLAYER LEFT'};
-          if(previous.carrier===peerId) {
-            const alive=players.filter(p=>p.alive);
-            updated.carrier=alive.length?sample(alive).id:null;
-          }
-          if(previous.phase==='playing' && players.filter(p=>p.alive).length<=1) {
-            const survivor=players.find(p=>p.alive);
-            if(survivor) survivor.wins += 1;
-            updated={...updated,phase:'champion',champion:survivor?.id||null,carrier:null,
-              event:survivor?.name.toUpperCase()+' WINS!'||'ROUND ENDED'};
-          }
-          publish(updated);
-        } else if(peerId===gameRef.current?.hostId) {
-          gameRef.current=null;setGame(null);setHostId('');
-          setNotice('Host disconnected. Return home to start another room.');
-        }
-      };
-      if(creator) {
-        let last=performance.now(),broadcast=0;
-        timerRef.current=setInterval(()=>{
-          const now=performance.now(), dt=Math.min((now-last)/1000,.12);
-          last=now;
-          const current=gameRef.current;
-          if(!current)return;
-          keysRef.current[selfId]=heldRef.current;
-          if(current.phase==='playing'||current.phase==='intermission') {
-            gameRef.current=advanceGame(current,keysRef.current,dt,now);
-            broadcast+=dt;
-            if(broadcast>=.09){broadcast=0;publish(gameRef.current);}
-          }
-        },35);
-      } else {
-        timerRef.current=setInterval(()=>{
-          safeSend(actions.current?.move,heldRef.current);
-        },90);
-      }
-      joinedRef.current=true;setRoomCode(code);setMode('room');
-      history.replaceState({},'',location.pathname+'?room='+code);
-    } catch(error) {
-      setNotice('Could not open room. Please try again. '+(error?.message||''));
-      try{roomRef.current?.leave();}catch{}
-      roomRef.current=null;
-    } finally {setConnecting(false);}
-  }
-  function start() {
-    if(!hostRef.current || !gameRef.current || gameRef.current.players.length<2) return;
-    publish(startMatch(gameRef.current));
-  }
-  function addBot() {
-    if(!hostRef.current || !gameRef.current || gameRef.current.phase!=='lobby')return;
-    const s=gameRef.current;if(s.players.length>=LIMIT)return;
-    const id='bot-'+Date.now().toString(36)+'-'+s.players.length;
-    const bot=makePlayer(id,'BOT '+(s.players.filter(p=>isBot(p.id)).length+1),s.players.length);
-    publish({...s,players:[...s.players,bot],event:'BOT JOINED THE CHAOS'});
-  }
-  function setDirection(dir,down) {
-    heldRef.current={...heldRef.current,[dir]:down};
-    if(!hostRef.current) safeSend(actions.current?.move,heldRef.current);
-  }
-  useEffect(()=>{
-    if(mode!=='room')return;
-    const keyMap={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right'};
-    const onKey=e=>{
-      if(['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;
-      const dir=keyMap[e.key.toLowerCase()];
-      if(dir){e.preventDefault();setDirection(dir,true);}
-    };
-    const onUp=e=>{const dir=keyMap[e.key.toLowerCase()];if(dir){e.preventDefault();setDirection(dir,false);}};
-    const onBlur=()=>{heldRef.current=emptyKeys();};
-    window.addEventListener('keydown',onKey);window.addEventListener('keyup',onUp);window.addEventListener('blur',onBlur);
-    return ()=>{window.removeEventListener('keydown',onKey);window.removeEventListener('keyup',onUp);window.removeEventListener('blur',onBlur);};
-  },[mode]);
-  async function copyRoom(){
-    const link=location.origin+location.pathname+'?room='+roomCode;
-    try {await navigator.clipboard.writeText(link);setNotice('Invite link copied!');}
-    catch{setNotice(link);}
-  }
-
-  const players=game?.players||[];
-  const me=players.find(p=>p.id===myId.current);
-  const champion=players.find(p=>p.id===game?.champion);
-  const carrier=players.find(p=>p.id===game?.carrier);
-  const playing=game?.phase==='playing';
-  const color=me?.color || COLORS[0];
-  return <div className="site">
-    <header className="topbar">
-      <div className="brand"><span className="brand-icon"><Icon kind="bomb" size={19}/></span><span>DATEWADE<span className="brand-dot">.</span>GAMES</span></div>
-      <div className="header-right"><span className="online-dot"/> NO DOWNLOADS. ALL CHAOS.</div>
-    </header>
-    {mode==='home' ? <main className="landing">
-      <section className="hero">
-        <div className="eyebrow"><span className="status-pip"/> THE FRIENDSHIP-ENDING PARTY GAME <span className="index">/ 001</span></div>
-        <div className="hero-art" aria-hidden="true"><div className="bomb-outline">✹</div><div className="danger-ring"/></div>
-        <div className="hero-copy"><div className="hero-kicker">YOUR FRIENDS. ONE BOMB. ZERO TRUST.</div>
-          <h1>BOMB<span>TAG</span><b>!</b></h1>
-          <p>One ticking bomb. One very unlucky friend. Tag someone to pass it before the clock hits zero. Last player standing wins.</p>
-          <div className="hero-stats"><span><Icon kind="users"/> 2–8 PLAYERS</span><span><Icon kind="bolt"/> QUICK-FIRE ROUNDS</span><span>⚡ NO SIGN-UP</span></div>
-        </div>
-      </section>
-      <section className="entry-wrap">
-        <div className="entry-card">
-          <div className="card-head"><span>01 / THE SETUP</span><span className="badge-hot">LET'S PLAY</span></div>
-          <label htmlFor="playerName" className="field-label">WHAT SHOULD WE CALL YOU?</label>
-          <input id="playerName" className="field" maxLength={15} placeholder="Your extremely cool name" value={name} onChange={e=>setName(e.target.value)} />
-          <div className="entry-actions"><button className="button primary" disabled={connecting} onClick={()=>connect(true)}>CREATE A ROOM <Icon kind="arrow"/></button>
-            <div className="or">OR JOIN THE GANG</div>
-            <div className="join"><input className="field code-field" aria-label="Room code" maxLength={6} placeholder="ROOM CODE" value={roomInput} onChange={e=>setRoomInput(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g,''))} onKeyDown={e=>{if(e.key==='Enter')connect(false);}}/><button className="button secondary" disabled={connecting} onClick={()=>connect(false)}>JOIN <Icon kind="arrow"/></button></div>
-          </div>
-          {notice && <p className="notice" role="status">{notice}</p>}
-          <div className="card-foot"><span className="green-dot"/> HOST A PRIVATE ROOM AND SHARE THE LINK WITH YOUR FRIENDS.</div>
-        </div>
-        <div className="how-card">
-          <div className="card-head"><span>02 / THE RULES</span><span>IT'S PERSONAL</span></div>
-          <div className="rule"><strong>01</strong><div><b>GET THE BOMB</b><p>One player starts each round holding a very bad surprise.</p></div></div>
-          <div className="rule"><strong>02</strong><div><b>PASS THE PROBLEM</b><p>Run into another player to make it their problem. Fast.</p></div></div>
-          <div className="rule"><strong>03</strong><div><b>DON'T EXPLODE</b><p>Whoever has it at zero gets eliminated. Last survivor wins.</p></div></div>
-          <div className="how-bottom">WASD / ARROW KEYS / TOUCH CONTROLS</div>
-        </div>
-      </section>
-      <div className="marquee"><div>FRIENDLY FIRE IS A LOVE LANGUAGE <span>✹</span> PASS THE BOMB <span>✹</span> TRUST NO ONE <span>✹</span> FRIENDLY FIRE IS A LOVE LANGUAGE <span>✹</span> PASS THE BOMB <span>✹</span></div></div>
-    </main> : <main className="room-page">
-      <div className="room-nav"><button className="text-button" onClick={stop}>← LEAVE GAME</button><div className="room-code"><small>YOUR ROOM</small><b>{roomCode}</b><button onClick={copyRoom} aria-label="Copy invite link" title="Copy invite link"><Icon kind="link"/></button></div></div>
-      {notice && <p className="notice floating" role="status">{notice}</p>}
-      <div className="game-grid">
-        <div className="arena-column">
-          <div className="game-head"><div><span className="eyebrow-mini">THE ARENA / NO MERCY</span><h2>BOMB<span>TAG!</span></h2></div><div className={'clock '+(playing && game.seconds<5?'urgent':'')}><small>{game?.phase==='intermission'?'NEXT ROUND':playing?'TIME LEFT':'STATUS'}</small><strong>{playing || game?.phase==='intermission'?Math.ceil(game.seconds).toString().padStart(2,'0'):game?.phase==='champion'?'GG':'--'}<span>{playing?'S':''}</span></strong></div></div>
-          <div className="arena" style={{'--my-color':color}}>
-            <div className="arena-lines" aria-hidden="true"/>
-            {!game ? <div className="arena-overlay"><div className="huge-icon">◎</div><h3>LOOKING FOR HOST</h3><p>Connecting to your friend's game. Make sure they're online.</p></div> : <>
-              {players.map(p=><div className={'player '+(!p.alive?'out':'')+(p.id===game.carrier?' is-bomb':'')+(p.id===myId.current?' is-me':'')} key={p.id}
-                style={{left:(p.x/WIDTH*100)+'%',top:(p.y/HEIGHT*100)+'%','--player-color':p.color}}>
-                <div className="player-body"><span>{p.id===game.carrier?'💣':p.name.slice(0,1).toUpperCase()}</span></div><div className="player-label">{p.id===myId.current?'YOU':p.name}</div>
-              </div>)}
-              {game.phase==='lobby' && <div className="arena-overlay"><div className="huge-icon">✹</div><h3>ASSEMBLE THE SQUAD</h3><p>{players.length} / {LIMIT} players connected. Invite friends or add bots.</p>{hostRef.current && <div className="overlay-actions"><button className="button secondary" onClick={addBot} disabled={players.length>=LIMIT}>+ ADD BOT</button><button className="button primary" disabled={players.length<2} onClick={start}>START GAME <Icon kind="arrow"/></button></div>}{!hostRef.current && <p className="subnote">Waiting for the host to start...</p>}</div>}
-              {game.phase==='intermission' && <div className="round-flash"><small>ROUND {game.round}</small><strong>{game.round===1?'GET READY':'NEXT UP'}</strong><span>{Math.ceil(game.seconds)}</span></div>}
-              {game.phase==='champion' && <div className="arena-overlay winner"><div className="huge-icon">🏆</div><h3>{champion ? champion.name.toUpperCase()+' WINS!' : 'DRAW!'}</h3><p>Friendships have been tested. Some did not survive.</p>{hostRef.current && <button className="button primary" onClick={start}>PLAY AGAIN <Icon kind="arrow"/></button>}{!hostRef.current && <p className="subnote">Waiting for host to rematch...</p>}</div>}
-            </>}
-            {playing && <div className="arena-banner">{carrier?.id===myId.current?'YOU HAVE THE BOMB — TAG SOMEONE!':carrier?carrier.name.toUpperCase()+' HAS THE BOMB':'RUN!'}</div>}
-            <div className="arena-coordinates">ARENA_001 // {game?.round?('ROUND '+game.round):'LOBBY'}</div>
-          </div>
-          <div className="under-arena"><span><span className="green-dot"/> {roomCode} · {game?'CONNECTED':'CONNECTING'}</span><span>{playing?'DON’T STOP MOVING':'WASD OR ARROWS TO MOVE'}</span></div>
-          <div className="mobile-controls" aria-label="Touch movement controls"><div className="d-pad">
-            {['up','left','down','right'].map(dir=><button key={dir} className={'pad '+dir} aria-label={'Move '+dir} onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);setDirection(dir,true);}} onPointerUp={e=>{e.preventDefault();setDirection(dir,false);}} onPointerCancel={()=>setDirection(dir,false)}>{({up:'▲',down:'▼',left:'◀',right:'▶'})[dir]}</button>)}
-          </div><span>HOLD TO MOVE</span></div>
-        </div>
-        <aside className="sidebar"><div className="sidebar-card"><div className="card-head"><span>THE SUSPECTS</span><span>{players.length} / {LIMIT}</span></div>
-          {players.length ? <div className="roster">{players.map(p=><div key={p.id} className={'roster-row '+(!p.alive?'eliminated':'')}><span className="roster-avatar" style={{background:p.color}}>{p.name[0]?.toUpperCase()}</span><div><b>{p.name}{p.id===myId.current?' (YOU)':''}</b><small>{!p.alive?'ELIMINATED':game?.carrier===p.id?'💣 HOLDING BOMB':isBot(p.id)?'BOT':'IN THE GAME'}</small></div><span className="wins">{p.wins?('🏆 '+p.wins):'—'}</span></div>)}</div> : <p className="sidebar-empty">Waiting for players...</p>}
-        </div><div className="sidebar-card tip-card"><div className="card-head"><span>MISSION CONTROL</span><span>↗</span></div><h4>PASS THE PROBLEM.</h4><p>Run into another player to pass the bomb. You have a brief safety window after tagging.</p><div className="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>OR</span><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div></div>
-        <button className="share-button" onClick={copyRoom}><Icon kind="link"/> COPY INVITE LINK <Icon kind="arrow"/></button></aside>
-      </div>
-    </main>}
-    <footer>MADE FOR FRIENDS, ENEMIES & EVERYONE IN BETWEEN. <strong>DATEWADE.COM © 2026</strong></footer>
-  </div>;
+  const up=e=>{const direction=map[e.key.toLowerCase()];
+   if(direction){e.preventDefault();directions.current.delete(direction);updateKeys();}};
+  const blur=()=>{directions.current.clear();control(0,0);};
+  window.addEventListener('keydown',down);window.addEventListener('keyup',up);
+  window.addEventListener('blur',blur);
+  return()=>{window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);
+   window.removeEventListener('blur',blur);blur();};
+ },[mode]);
+ const pads=[['up','▲'],['left','◀'],['down','▼'],['right','▶']];
+ const partyStatus=game?.phase==='playing'?challenge.family.name:
+   game?.phase==='countdown'?'GAME STARTING':game?.phase==='results'?'ROUND COMPLETE':
+   game?.phase==='podium'?'PARTY CHAMPION':'GATHER THE GANG';
+ const showCatalog=(game?.phase==='lobby'&&isHost)||mode==='home';
+ return <div className="site">
+  <header className="navigation"><div className="nav-inner">
+   <button className="logo" onClick={()=>mode==='arena'?disconnect():setCatalogOpen(false)} aria-label="DateWade Games home">
+    <span className="logo-mark">DW<span>✦</span></span><span>DATEWADE <b>GAMES</b></span>
+   </button><div className="nav-links"><span className="pill green">● 3D PARTY ARENA</span><span className="pill">300 CHALLENGES</span>
+    {mode==='arena'&&<button className="nav-exit" onClick={disconnect}>LEAVE ROOM ↗</button>}</div>
+  </div></header>
+  {mode==='home'?<main className="home">
+   <section className="home-hero">
+    <div className="hero-text"><div className="kicker"><span className="dot"/> THE ULTIMATE FRIENDSHIP TEST</div>
+     <h1>THE PARTY<br/>IS <em>ON<span>!</span></em></h1>
+     <p>300 fast, ridiculous challenges. One 3D arena. Your friends. Zero mercy. No downloads, no signups—just absolute chaos.</p>
+     <div className="hero-badges"><span>✦ 2–8 FRIENDS</span><span>⚡ 20–30 SEC GAMES</span><span>◉ IN YOUR BROWSER</span></div>
+    </div>
+    <div className="hero-stage"><Arena3D game={demo} meId="demo"/>
+     <span className="stage-note">MEET YOUR NEW PLAYGROUND ↗</span>
+    </div>
+   </section>
+   <div className="home-grid">
+    <section className="create-panel"><div className="card-overline"><span>01 / THE GAME LOBBY</span><span className="tag">PLAY NOW</span></div>
+     <h2>GATHER THE SQUAD<span>.</span></h2>
+     <label htmlFor="player-name">YOUR PLAYER NAME</label>
+     <input id="player-name" maxLength={15} value={name} placeholder="Your totally normal nickname" onChange={e=>setName(e.target.value)}/>
+     <button className="action lime wide" disabled={connecting} onClick={()=>connect(true)}>CREATE A PRIVATE ROOM <span>↗</span></button>
+     <div className="divider-text"><span>OR JOIN SOMEONE ELSE</span></div>
+     <div className="join-row"><input aria-label="Six character room code" placeholder="ROOM CODE" maxLength={6}
+      value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g,''))}
+      onKeyDown={e=>{if(e.key==='Enter')connect(false);}}/>
+      <button className="action dark" disabled={connecting} onClick={()=>connect(false)}>JOIN ↗</button>
+     </div>
+     {notice&&<p className="notice" role="status">{notice}</p>}
+     <p className="tiny-hint">↗ SHARE A ROOM LINK. EVERYBODY PLAYS IN THE SAME ARENA.</p>
+    </section>
+    <section className="spotlight"><div className="card-overline"><span>02 / THE LINEUP</span><span>∞ REPLAYABILITY</span></div>
+     <h2>TWELVE WAYS<br/>TO <span>LOSE FRIENDS.</span></h2>
+     <div className="spotlight-list">{GAME_MODES.slice(0,4).map((m,i)=><div className="spotlight-row" key={m.slug}>
+      <span className="mode-emoji">{m.icon}</span><div><b>{m.name}</b><small>{m.rule}</small></div><span className="spotlight-n">{String(i+1).padStart(2,'0')}</span>
+     </div>)}</div>
+     <button className="outline-button" onClick={()=>setCatalogOpen(true)}>BROWSE ALL 300 CHALLENGES <span>↗</span></button>
+    </section>
+   </div>
+   <section className="bottom-strip"><span>12 GAME MODES</span><span>✦</span><span>25 STAGE VARIATIONS EACH</span><span>✦</span><span>300 PLAYABLE CHALLENGES</span></section>
+  </main>:<main className="room">
+   <div className="room-top"><div><span className="small-label">DATEWADE / PARTY ARENA</span>
+     <h1>{partyStatus}<span>.</span></h1></div>
+     <div className="invite"><span>PRIVATE ROOM <b>{roomCode}</b></span><button onClick={copyLink}>COPY INVITE ↗</button></div>
+   </div>
+   {notice&&<div className="toast" role="status">{notice}</div>}
+   <div className="room-grid"><section className="play-column">
+    <div className="game-toolbar"><div className="mode-name"><span>{challenge.family.icon}</span>
+      <div><small>CHALLENGE #{String(challenge.id+1).padStart(3,'0')} · {challenge.course}</small>
+       <b>{challenge.family.name}</b></div></div>
+      <div className="clock"><small>{game?.phase==='playing'?'TIME LEFT':game?.phase==='countdown'?'STARTS IN':game?.phase==='results'?'NEXT ROUND IN':'ROUND'}</small>
+       <strong>{game?.phase==='playing'||game?.phase==='countdown'||game?.phase==='results'?Math.ceil(game.remaining||0).toString().padStart(2,'0'):game?.round||'—'}</strong></div></div>
+    <div className="gameframe"><Arena3D game={game||demo} meId={idRef.current||'demo'}/>
+     {game?.phase==='playing'&&<div className="objective"><span>{challenge.family.icon}</span>{challenge.family.rule}</div>}
+     {game?.phase==='countdown'&&<div className="overlay-interlude"><div className="interlude-kicker">ROUND {game.round} OF {game.maxRounds}</div>
+      <h2>{challenge.family.name}</h2><p>{challenge.family.rule}</p><strong>{Math.ceil(game.remaining)}</strong></div>}
+     {game?.phase==='results'&&<div className="overlay-interlude"><div className="interlude-kicker">ROUND {game.round} COMPLETE</div>
+      <h2>{game.players.find(p=>p.id===game.winner)?.name||'SOMEBODY'} WINS!</h2><p>{game.event}</p><strong>{Math.ceil(game.remaining)}</strong></div>}
+     {game?.phase==='podium'&&<div className="overlay-interlude"><div className="interlude-kicker">THE FINAL VERDICT</div>
+      <h2>🏆 {game.players.find(p=>p.id===game.winner)?.name||'NOBODY'} WINS!</h2><p>Bragging rights secured. Friendships questionable.</p>
+      {isHost&&<button className="action lime" onClick={rematch}>PLAY AGAIN ↗</button>}</div>}
+     {game?.phase==='lobby'&&<div className="overlay-interlude lobby-overlay"><div className="interlude-kicker">THE SQUAD IS ASSEMBLING</div>
+      <h2>READY TO PARTY?</h2><p>{game.players.length} / 8 players · {game.maxRounds} short games per party</p>
+      {isHost?<div className="lobby-ctas"><button onClick={addBot} disabled={game.players.length>=8} className="action dark">+ ADD BOT</button>
+       <button className="action lime" onClick={start} disabled={game.players.length<2}>START THE PARTY ↗</button></div>
+       :<p className="waiting">WAITING FOR THE HOST TO START...</p>}</div>}
+     {!game&&<div className="overlay-interlude"><h2>CONNECTING...</h2><p>Looking for your friend's lobby. Make sure the host is online.</p></div>}
+    </div>
+    <div className="game-foot"><span className="connection">● {game?'ROOM CONNECTED':'CONNECTING TO HOST'} · WEBRTC</span>
+      <button className="minimal" onClick={()=>setShowHelp(v=>!v)}>{showHelp?'HIDE':'SHOW'} CONTROLS (?)</button>
+      <button className="minimal" onClick={()=>setSfx(v=>!v)}>SFX {sfx?'ON':'OFF'}</button></div>
+    {showHelp&&<div className="help-box">Move with <b>WASD</b>, <b>arrow keys</b>, or the on-screen controls. Your camera follows your character. You earn party points by placing in each round. The host chooses when to start.</div>}
+    <div className="touch-area"><span>MOVE YOUR CHARACTER</span><div className="touchpad">{pads.map(([direction,glyph])=><button key={direction} className={'pad '+direction} aria-label={'Move '+direction}
+      onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);directions.current.add(direction);updateKeys();}}
+      onPointerUp={e=>{e.preventDefault();directions.current.delete(direction);updateKeys();}}
+      onPointerCancel={()=>{directions.current.delete(direction);updateKeys();}}>{glyph}</button>)}</div></div>
+   </section>
+   <aside className="room-side"><section className="side-card"><div className="side-head"><span>THE PLAYERS</span><span>{game?.players?.length||0}/8</span></div>
+    <div className="leaderboard">{scoreboard.map((p,i)=><div className="player-row" key={p.id}>
+      <span className="player-place">{String(i+1).padStart(2,'0')}</span><span className="player-face" style={{background:p.color}}>{p.name?.[0]?.toUpperCase()}</span>
+      <span className="player-ident"><b>{p.name}{p.id===idRef.current?' (YOU)':''}</b><small>{p.id.startsWith('bot-')?'AI OPPONENT':p.id===game.hostId?'ROOM HOST':'CHALLENGER'}</small></span>
+      <span className="player-points">{game?.phase==='lobby'?'—':game?.phase==='podium'?p.points:formatPoints(p.score)}</span>
+     </div>)}</div>
+   </section>
+    <section className="side-card selection"><div className="side-head"><span>THE GAME PLAN</span><span>{game?.round||0}/{game?.maxRounds||5}</span></div>
+      <p>12 minigame mechanics × 25 evolving stages. The next round rotates through the 300-challenge lineup.</p>
+      {game?.phase==='lobby'&&isHost&&<div className="settings"><label>NUMBER OF GAMES</label>
+       <select value={game.maxRounds} onChange={e=>option({maxRounds:e.target.value})}><option value="5">5 GAMES</option><option value="10">10 GAMES</option><option value="20">20 GAMES</option></select>
+       <label>FIRST CHALLENGE</label><button className="select-challenge" onClick={()=>setCatalogOpen(true)}>#{String(game.selection+1).padStart(3,'0')} — {preset(game.selection).family.name} ↗</button>
+      </div>}
+      {game?.phase!=='lobby'&&<div className="progress"><div style={{width:(100*(game?.round||0)/(game?.maxRounds||5))+'%'}}/></div>}
+     </section>
+     <button className="action lime wide" onClick={copyLink}>COPY INVITE LINK <span>↗</span></button>
+     <div className="hint-card"><b>FIND YOUR FRIENDS. OUTRUN THE CHAOS.</b><p>Each match is short. Every point counts. Whoever leads after the final game becomes the party champion.</p></div>
+   </aside></div>
+  </main>}
+  {catalogOpen&&showCatalog&&<div className="modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setCatalogOpen(false);}}>
+   <section className="catalog-modal" role="dialog" aria-modal="true" aria-labelledby="catalog-heading">
+    <div className="catalog-header"><div><span className="small-label">THE COMPLETE LINEUP / 300</span><h2 id="catalog-heading">CHALLENGE <em>VAULT.</em></h2>
+     <p>12 distinct minigame types, each with 25 gameplay stage variants.</p></div>
+     <button onClick={()=>setCatalogOpen(false)} aria-label="Close challenge catalog" className="close-modal">✕</button></div>
+    <div className="catalog-filters"><button className={familyFilter==='all'?'active':''} onClick={()=>setFamilyFilter('all')}>ALL 300</button>
+     {GAME_MODES.map((f,i)=><button key={f.slug} className={familyFilter===String(i)?'active':''} onClick={()=>setFamilyFilter(String(i))}>{f.icon} {f.name}</button>)}</div>
+    <div className="catalog-grid">{filtered.map(c=><button className="catalog-item" key={c.id}
+      onClick={()=>{if(mode==='arena'&&hostRef.current&&gameRef.current?.phase==='lobby')option({selection:c.id});setCatalogOpen(false);}}>
+      <span className="challenge-index">#{String(c.number).padStart(3,'0')}</span><span className="catalog-icon">{c.family.icon}</span>
+      <b>{c.family.name}</b><small>{c.theme} · {c.course} · STAGE {c.variant+1}/25</small>
+     </button>)}</div>
+   </section></div>}
+  <footer className="footer"><span>DATEWADE.GAMES / FRIENDSHIP IS TEMPORARY. GLORY IS FOREVER.</span><span>MADE FOR THE GROUP CHAT ✦ 2026</span></footer>
+ </div>;
 }
