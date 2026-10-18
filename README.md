@@ -1,24 +1,19 @@
-# Bomb Tag! — DateWade Games
+# DateWade Party Arena
 
-Browser multiplayer party game for 2–8 players. One player holds a ticking bomb and tags others to pass it. Whoever holds it when time runs out is eliminated.
+A 3D third-person browser party game for 2–8 friends. The catalog contains 300 playable *challenge combinations*, made from 12 mechanically distinct minigame families across 25 increasingly difficult stage variants. These are not 300 independently authored minigame types.
 
-## Run locally
+## Local development
 
-```bash
-npm install
-npm run dev
-```
+Run npm install, npm test, and npm run dev. Open two browser windows and have both join the same room. The host starts a session; participants use WASD/arrow keys or the mobile joystick. The host may add bots.
 
-Open http://localhost:3000 in two different browsers or devices. Create a room and share the six-character room code or invite link.
+## Networking
 
-## Multiplayer architecture
+Host-authoritative game simulation with Trystero 0.26's encrypted WebRTC peer-to-peer data channels. Host sends snapshots, peers send directional inputs. Public Nostr relays coordinate discovery. No new paid service. Rooms are ephemeral: the session ends when the host leaves. Room links are not authentication and NAT/firewall restrictions may require a TURN relay.
 
-Trystero 0.26.0 uses public Nostr relays for peer discovery, then connects browsers directly via WebRTC. No dedicated game server or database is needed. The room creator is authoritative for gameplay; when the creator leaves, the match closes. Some firewalls/NATs can prevent P2P connectivity without TURN.
+## Games and challenges
 
-## Controls
+The catalog has 12 rulesets: Bomb Tag, Coin Dash, King of the Hill, Meteor Mayhem, Laser Leap, Shrinking Island, Red Light, Freeze Dance, Checkpoint Rush, Flag Frenzy, Tag Frenzy, Hot Tiles. Each ruleset has 25 stage variants modifying obstacles, speed, hazard frequency, difficulty and theme. 5, 10 or 20 games form a party; score is awarded for each round. The challenge sequence covers all 300 before repeating.
 
-Desktop: WASD or arrow keys. Mobile: on-screen D-pad. Up to eight human or bot players. Host can add bots in lobby to practice.
+## Performance
 
-## Important
-
-The invite code is not an authentication mechanism. Rooms are temporary, share game data only, and have no saved leaderboard. For more robust connectivity at scale, add a dedicated signaling/TURN service or managed real-time game backend.
+Three.js WebGL scene with pixel ratio capped for phones, geometry shared, camera follow interpolation and responsive joystick. 3D requires WebGL 2.
