@@ -27,6 +27,7 @@ export default function Home(){
  const idRef=useRef(''),roomRef=useRef(null),actionsRef=useRef({}),hostRef=useRef(false),hostPeerRef=useRef('');
  const gameRef=useRef(null),heldRef=useRef(blank()),inputRef=useRef({}),tickRef=useRef(null);
  const connectionRef=useRef(false),lastEvent=useRef(-1),audioRef=useRef(null);
+ const uiPaint=useRef({at:0,phase:'',seq:-1});
  const isHost=hostRef.current;
  const me=game?.players?.find(p=>p.id===idRef.current);
  const challenge=preset(game?.phase==='lobby' ? game?.selection||0 : game?.challenge||0);
@@ -54,8 +55,14 @@ export default function Home(){
  },[game?.seq,sfx,game?.phase]);
  useEffect(()=>()=>{if(tickRef.current)clearInterval(tickRef.current);
   try{roomRef.current?.leave();}catch{}audioRef.current?.close().catch(()=>{});},[]);
+ function refreshUI(next,force=false){
+  const now=performance.now(),prev=uiPaint.current;
+  if(force||now-prev.at>=260||next.phase!==prev.phase||next.seq!==prev.seq){
+   uiPaint.current={at:now,phase:next.phase,seq:next.seq};setGame(next);
+  }
+ }
  function publish(next){
-  gameRef.current=next;setGame(next);
+  gameRef.current=next;refreshUI(next);
   if(hostRef.current)safeSend(actionsRef.current.state,next);
  }
  function disconnect(){
@@ -63,7 +70,7 @@ export default function Home(){
   try{roomRef.current?.leave();}catch{}
   roomRef.current=null;actionsRef.current={};hostRef.current=false;hostPeerRef.current='';
   idRef.current='';connectionRef.current=false;inputRef.current={};heldRef.current=blank();
-  gameRef.current=null;setGame(null);setRoomCode('');setMode('home');setNotice('');setCatalogOpen(false);
+  gameRef.current=null;uiPaint.current={at:0,phase:'',seq:-1};setGame(null);setRoomCode('');setMode('home');setNotice('');setCatalogOpen(false);
   if(typeof window!=='undefined')history.replaceState({},'',location.pathname);
  }
  async function connect(host){
@@ -84,7 +91,7 @@ export default function Home(){
    actionsRef.current={hello,state,input};
    if(host){
     gameRef.current=freshRoom(selfId,playerName);
-    setGame(gameRef.current);hostPeerRef.current=selfId;
+    refreshUI(gameRef.current,true);hostPeerRef.current=selfId;
    }else{gameRef.current=null;setGame(null);}
    hello.onMessage=(data,{peerId})=>{
     if(!data||typeof data.name!=='string')return;
@@ -105,7 +112,7 @@ export default function Home(){
     if(host||!incoming||!Array.isArray(incoming.players))return;
     if(incoming.hostId!==peerId||incoming.players.length>8)return;
     if(hostPeerRef.current&&hostPeerRef.current!==peerId)return;
-    hostPeerRef.current=peerId;gameRef.current=incoming;setGame(incoming);
+    hostPeerRef.current=peerId;gameRef.current=incoming;refreshUI(incoming);
     if(incoming.event==='ROOM FULL')setNotice('Room is full, sorry!');
     else setNotice('');
    };
@@ -272,7 +279,7 @@ export default function Home(){
      {!game&&<div className="overlay-interlude"><h2>CONNECTING...</h2><p>Looking for your friend's lobby. Make sure the host is online.</p></div>}
     </div>
     <div className="game-foot"><span className="connection">● {game?'ROOM CONNECTED':'CONNECTING TO HOST'} · WEBRTC</span>
-      <button className="minimal" onClick={()=>setShowHelp(v=>!v)}>{showHelp?'HIDE':'SHOW'} CONTROLS (?)</button>
+      <span className="input-hint">SPACE = DOUBLE-JUMP</span><button className="minimal" onClick={()=>setShowHelp(v=>!v)}>{showHelp?'HIDE':'SHOW'} CONTROLS (?)</button>
       <button className="minimal" onClick={()=>setSfx(v=>!v)}>SFX {sfx?'ON':'OFF'}</button></div>
     {showHelp&&<div className="help-box">Move with <b>WASD</b>, <b>arrow keys</b>, <b>SPACE to double-jump</b>, or the on-screen controls. Your camera follows your character. You earn party points by placing in each round. The host chooses when to start.</div>}
     <div className="touch-area"><span>MOVE YOUR CHARACTER · JUMP TO DODGE HAZARDS</span><div className="touchpad">{pads.map(([direction,glyph])=><button key={direction} className={'pad '+direction} aria-label={'Move '+direction}
