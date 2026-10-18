@@ -7,7 +7,7 @@ import {GAME_MODES,catalog,TOTAL_CHALLENGES,preset,newPlayer,freshRoom,addPlayer
 const APP_ID='com.datewade.party.arena.2026';
 const ID_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const clean=(v)=>String(v||'').trim().slice(0,15)||'Party Animal';
-const blank=()=>({x:0,z:0});
+const blank=()=>({x:0,z:0,jump:false});
 const safeSend=(action,data,opts)=>{if(action)Promise.resolve(action.send(data,opts)).catch(()=>{});};
 function inviteCode(){
  const bytes=new Uint8Array(6);crypto.getRandomValues(bytes);
@@ -112,7 +112,7 @@ export default function Home(){
    input.onMessage=(data,{peerId})=>{
     if(!host||!gameRef.current?.players.some(p=>p.id===peerId))return;
     inputRef.current[peerId]={x:Math.max(-1,Math.min(1,Number(data?.x)||0)),
-      z:Math.max(-1,Math.min(1,Number(data?.z)||0))};
+      z:Math.max(-1,Math.min(1,Number(data?.z)||0)),jump:data?.jump===true};
    };
    room.onPeerJoin=(peerId)=>{
     safeSend(hello,{name:playerName,host},{target:peerId});
@@ -127,9 +127,7 @@ export default function Home(){
      gameRef.current=null;setGame(null);
     }
    };
-   const next=host?freshRoom(selfId,playerName):null;
-   if(host){gameRef.current=next;setGame(next);}
-   connectionRef.current=true;
+      connectionRef.current=true;
    setRoomCode(code);setMode('arena');
    history.replaceState({},'',location.pathname+'?room='+code);
    let last=performance.now(),broadcast=0;
@@ -170,8 +168,12 @@ export default function Home(){
   try{await navigator.clipboard.writeText(url);setNotice('Invite link copied!');}
   catch{setNotice(url);}
  }
- function control(x,z){heldRef.current={x,z};
+ function control(x,z){heldRef.current={...heldRef.current,x,z};
   if(!hostRef.current)safeSend(actionsRef.current.input,heldRef.current,{target:hostPeerRef.current||undefined});}
+ function setJump(pressed){
+  heldRef.current={...heldRef.current,jump:pressed};
+  if(!hostRef.current)safeSend(actionsRef.current.input,heldRef.current,{target:hostPeerRef.current||undefined});
+ }
  const directions=useRef(new Set());
  const updateKeys=()=>{
   const d=directions.current;
@@ -182,12 +184,13 @@ export default function Home(){
   if(mode!=='arena')return;
   const map={w:'up',arrowup:'up',s:'down',arrowdown:'down',a:'left',arrowleft:'left',d:'right',arrowright:'right'};
   const down=e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;
+   if(e.code==='Space'){e.preventDefault();setJump(true);return;}
    const direction=map[e.key.toLowerCase()];
    if(direction){e.preventDefault();directions.current.add(direction);updateKeys();}
   };
-  const up=e=>{const direction=map[e.key.toLowerCase()];
+  const up=e=>{if(e.code==='Space'){e.preventDefault();setJump(false);return;}const direction=map[e.key.toLowerCase()];
    if(direction){e.preventDefault();directions.current.delete(direction);updateKeys();}};
-  const blur=()=>{directions.current.clear();control(0,0);};
+  const blur=()=>{directions.current.clear();control(0,0);setJump(false);};
   window.addEventListener('keydown',down);window.addEventListener('keyup',up);
   window.addEventListener('blur',blur);
   return()=>{window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);
@@ -210,7 +213,7 @@ export default function Home(){
     <div className="hero-text"><div className="kicker"><span className="dot"/> THE ULTIMATE FRIENDSHIP TEST</div>
      <h1>THE PARTY<br/>IS <em>ON<span>!</span></em></h1>
      <p>300 fast, ridiculous challenges. One 3D arena. Your friends. Zero mercy. No downloads, no signups—just absolute chaos.</p>
-     <div className="hero-badges"><span>✦ 2–8 FRIENDS</span><span>⚡ 20–30 SEC GAMES</span><span>◉ IN YOUR BROWSER</span></div>
+     <div className="hero-badges"><span>✦ 2–8 FRIENDS</span><span>⚡ 55–87 SEC GAMES</span><span>◉ IN YOUR BROWSER</span></div>
     </div>
     <div className="hero-stage"><Arena3D game={demo} meId="demo"/>
      <span className="stage-note">MEET YOUR NEW PLAYGROUND ↗</span>
@@ -252,7 +255,7 @@ export default function Home(){
        <b>{challenge.family.name}</b></div></div>
       <div className="clock"><small>{game?.phase==='playing'?'TIME LEFT':game?.phase==='countdown'?'STARTS IN':game?.phase==='results'?'NEXT ROUND IN':'ROUND'}</small>
        <strong>{game?.phase==='playing'||game?.phase==='countdown'||game?.phase==='results'?Math.ceil(game.remaining||0).toString().padStart(2,'0'):game?.round||'—'}</strong></div></div>
-    <div className="gameframe"><Arena3D game={game||demo} meId={idRef.current||'demo'}/>
+    <div className="gameframe"><Arena3D game={game||demo} liveRef={gameRef} meId={idRef.current||'demo'}/>
      {game?.phase==='playing'&&<div className="objective"><span>{challenge.family.icon}</span>{challenge.family.rule}</div>}
      {game?.phase==='countdown'&&<div className="overlay-interlude"><div className="interlude-kicker">ROUND {game.round} OF {game.maxRounds}</div>
       <h2>{challenge.family.name}</h2><p>{challenge.family.rule}</p><strong>{Math.ceil(game.remaining)}</strong></div>}
@@ -271,11 +274,13 @@ export default function Home(){
     <div className="game-foot"><span className="connection">● {game?'ROOM CONNECTED':'CONNECTING TO HOST'} · WEBRTC</span>
       <button className="minimal" onClick={()=>setShowHelp(v=>!v)}>{showHelp?'HIDE':'SHOW'} CONTROLS (?)</button>
       <button className="minimal" onClick={()=>setSfx(v=>!v)}>SFX {sfx?'ON':'OFF'}</button></div>
-    {showHelp&&<div className="help-box">Move with <b>WASD</b>, <b>arrow keys</b>, or the on-screen controls. Your camera follows your character. You earn party points by placing in each round. The host chooses when to start.</div>}
-    <div className="touch-area"><span>MOVE YOUR CHARACTER</span><div className="touchpad">{pads.map(([direction,glyph])=><button key={direction} className={'pad '+direction} aria-label={'Move '+direction}
+    {showHelp&&<div className="help-box">Move with <b>WASD</b>, <b>arrow keys</b>, <b>SPACE to double-jump</b>, or the on-screen controls. Your camera follows your character. You earn party points by placing in each round. The host chooses when to start.</div>}
+    <div className="touch-area"><span>MOVE YOUR CHARACTER · JUMP TO DODGE HAZARDS</span><div className="touchpad">{pads.map(([direction,glyph])=><button key={direction} className={'pad '+direction} aria-label={'Move '+direction}
       onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);directions.current.add(direction);updateKeys();}}
       onPointerUp={e=>{e.preventDefault();directions.current.delete(direction);updateKeys();}}
-      onPointerCancel={()=>{directions.current.delete(direction);updateKeys();}}>{glyph}</button>)}</div></div>
+      onPointerCancel={()=>{directions.current.delete(direction);updateKeys();}}>{glyph}</button>)}</div><button className="jump-button" aria-label="Jump or double jump"
+       onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);setJump(true);}}
+       onPointerUp={()=>setJump(false)} onPointerCancel={()=>setJump(false)}>⤒ JUMP</button></div>
    </section>
    <aside className="room-side"><section className="side-card"><div className="side-head"><span>THE PLAYERS</span><span>{game?.players?.length||0}/8</span></div>
     <div className="leaderboard">{scoreboard.map((p,i)=><div className="player-row" key={p.id}>
