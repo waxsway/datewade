@@ -145,7 +145,12 @@ export default function Arena3D({game,meId,liveRef}){
   const characterLayer=new THREE.Group();scene.add(characterLayer);
   const pool=new Map();
   const vector=new THREE.Vector3();
-  let lastFrame=0;const minFrame=1000/(lowPower?30:55);
+  let lastFrame=0,lastRender=0,slow=0,samples=0,adaptiveLow=lowPower;
+  let visible=true;
+  const observer=typeof IntersectionObserver!=='undefined'
+    ?new IntersectionObserver(entries=>{visible=entries[0]?.isIntersecting??true;},{threshold:.01}):null;
+  observer?.observe(root);
+  const minFrame=1000/(lowPower?30:55);
   let stage=-1,objects={hazards:[],coins:[],flags:[],gates:[],tiles:[]},raf=0,disposed=false;
   let last=performance.now(),view={x:0,z:0};
   const sized=()=>{const w=Math.max(1,root.clientWidth),h=Math.max(1,root.clientHeight);
@@ -176,17 +181,22 @@ export default function Arena3D({game,meId,liveRef}){
        i%2?0:sign*13.9,i%2?-.1:.2,i%2?sign*13.9:0);
    }
    for(const r of [4.4,8.5,10.7])ring(arena,r,r===8.5?edge:trim,.02);
-   for(const sign of [-1,1]){
-     for(let j=-4;j<=4;j++){
-       cube(arena,.70,.12,1.1,edge,sign*12.14,.22,j*2.7);
-       cube(arena,1.1,.12,.70,trim,j*2.7,.22,sign*12.14);
+   for(let orientation=0;orientation<2;orientation++){
+     const stripe=new THREE.InstancedMesh(new THREE.BoxGeometry(.70,.12,1.1),
+       orientation?trim:edge,18);
+     const dummy=new THREE.Object3D();
+     for(let i=0;i<18;i++){
+       const side=i<9?-1:1,j=(i%9)-4;
+       dummy.position.set(orientation?j*2.7:side*12.14,.18,
+         orientation?side*12.14:j*2.7);
+       dummy.rotation.set(0,orientation?Math.PI/2:0,0);
+       dummy.updateMatrix();stripe.setMatrixAt(i,dummy.matrix);
      }
+     stripe.instanceMatrix.needsUpdate=true;arena.add(stripe);
    }
 
-   for(let i=-12;i<=12;i+=2){
-    cube(arena,24.7,.014,.038,tile,0,-.085,i);
-    cube(arena,.038,.014,24.7,tile,i,-.085,0);
-   }
+   const grid=new THREE.GridHelper(24,12,secondary,'#444a6c');
+   grid.position.y=-.065;arena.add(grid);
    for(const sign of [-1,1]){
     cube(arena,26,1.55,.65,wall,0,.68,sign*12.7);
     cube(arena,.65,1.55,26,wall,sign*12.7,.68,0);
@@ -286,7 +296,16 @@ export default function Arena3D({game,meId,liveRef}){
    raf=requestAnimationFrame(animate);
    if(document.hidden||now-lastFrame<minFrame)return;
    // Avoid work while scrolled offscreen, e.g. the homepage 3D preview.
-   if(!root.isConnected)return;
+   if(!root.isConnected||!visible)return;
+   if(!adaptiveLow && lastRender>0){
+     slow+=Number(now-lastRender>32);
+     if(++samples>=90){
+       if(slow>42){adaptiveLow=true;renderer.setPixelRatio(1);sun.castShadow=false;
+         renderer.shadowMap.enabled=false;renderer.setSize(root.clientWidth,root.clientHeight,false);}
+       samples=0;slow=0;
+     }
+   }
+   lastRender=now;
    lastFrame=now;
    const g=liveRef?.current||current.current;
    if(g){
@@ -328,7 +347,7 @@ export default function Arena3D({game,meId,liveRef}){
   };
   raf=requestAnimationFrame(animate);
   return ()=>{
-   disposed=true;cancelAnimationFrame(raf);resize.disconnect();
+   disposed=true;cancelAnimationFrame(raf);resize.disconnect();observer?.disconnect();
    cleanupLayer(characterLayer);cleanupLayer(arena);
    renderer.dispose();renderer.domElement.remove();
   };
