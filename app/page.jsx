@@ -7,7 +7,7 @@ import {GAME_MODES,catalog,TOTAL_CHALLENGES,preset,newPlayer,freshRoom,addPlayer
 const APP_ID='com.datewade.party.arena.2026';
 const ID_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const clean=(v)=>String(v||'').trim().slice(0,15)||'Party Animal';
-const blank=()=>({x:0,z:0,jump:false});
+const blank=()=>({x:0,z:0,jump:false,jumpId:0});
 const safeSend=(action,data,opts)=>{if(action)Promise.resolve(action.send(data,opts)).catch(()=>{});};
 function inviteCode(){
  const bytes=new Uint8Array(6);crypto.getRandomValues(bytes);
@@ -112,7 +112,7 @@ export default function Home(){
    input.onMessage=(data,{peerId})=>{
     if(!host||!gameRef.current?.players.some(p=>p.id===peerId))return;
     inputRef.current[peerId]={x:Math.max(-1,Math.min(1,Number(data?.x)||0)),
-      z:Math.max(-1,Math.min(1,Number(data?.z)||0)),jump:data?.jump===true};
+      z:Math.max(-1,Math.min(1,Number(data?.z)||0)),jump:data?.jump===true,jumpId:Math.max(0,Math.floor(Number(data?.jumpId)||0))};
    };
    room.onPeerJoin=(peerId)=>{
     safeSend(hello,{name:playerName,host},{target:peerId});
@@ -171,7 +171,7 @@ export default function Home(){
  function control(x,z){heldRef.current={...heldRef.current,x,z};
   if(!hostRef.current)safeSend(actionsRef.current.input,heldRef.current,{target:hostPeerRef.current||undefined});}
  function setJump(pressed){
-  heldRef.current={...heldRef.current,jump:pressed};
+  heldRef.current={...heldRef.current,jump:pressed,jumpId:(heldRef.current.jumpId||0)+(pressed&&!heldRef.current.jump?1:0)};
   if(!hostRef.current)safeSend(actionsRef.current.input,heldRef.current,{target:hostPeerRef.current||undefined});
  }
  const directions=useRef(new Set());
