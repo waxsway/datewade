@@ -109,7 +109,7 @@ function character(p){
  const bombRing=new THREE.Group();ring(bombRing,1.05,mat('#ff6f9e','#ff2460',1.9),.17);group.add(bombRing);
  return {group,shadow,legs,arms,bombRing,label,torso:torsoMesh};
 }
-export default function Arena3D({game,meId}){
+export default function Arena3D({game,meId,liveRef}){
  const mount=useRef(null),current=useRef(game),playerId=useRef(meId),[error,setError]=useState('');
  current.current=game;playerId.current=meId;
  useEffect(()=>{
@@ -257,9 +257,9 @@ export default function Arena3D({game,meId}){
     seen.add(p.id);
     if(!pool.has(p.id)){const entry=character(p);characterLayer.add(entry.group);characterLayer.add(entry.shadow);pool.set(p.id,entry);}
     const entry=pool.get(p.id);
-    entry.group.visible=p.alive;
-    entry.group.position.x=THREE.MathUtils.lerp(entry.group.position.x,p.x,.26);
-    entry.group.position.z=THREE.MathUtils.lerp(entry.group.position.z,p.z,.26);
+    entry.group.visible=p.alive;entry.shadow.visible=p.alive;
+    entry.group.position.x=THREE.MathUtils.lerp(entry.group.position.x,p.x,.34);
+    entry.group.position.z=THREE.MathUtils.lerp(entry.group.position.z,p.z,.34);
     entry.group.position.y=THREE.MathUtils.lerp(entry.group.position.y,p.y||0,.38);
     entry.shadow.position.x=entry.group.position.x;
     entry.shadow.position.z=entry.group.position.z;
@@ -285,8 +285,10 @@ export default function Arena3D({game,meId}){
    if(disposed)return;
    raf=requestAnimationFrame(animate);
    if(document.hidden||now-lastFrame<minFrame)return;
+   // Avoid work while scrolled offscreen, e.g. the homepage 3D preview.
+   if(!root.isConnected)return;
    lastFrame=now;
-   const g=current.current;
+   const g=liveRef?.current||current.current;
    if(g){
     if(g.challenge!==stage)buildArena(g.challenge);
     syncCharacters(g.players||[]);
