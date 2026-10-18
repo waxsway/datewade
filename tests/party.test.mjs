@@ -37,7 +37,7 @@ test('lobby/countdown/play/results/next round loop',()=>{
  assert.equal(g.players.length,2);
  g=beginParty(g);assert.equal(g.phase,'countdown');
  g=advance(g,3.1);assert.equal(g.phase,'playing');
- g=advance(g,30);assert.equal(g.phase,'results');
+ g=advance(g,21.2);assert.equal(g.phase,'results');
  g=advance(g,5.1);assert.equal(g.phase,'countdown');
  assert.equal(g.round,2);
 });
